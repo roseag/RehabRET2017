@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8">
+ <title>Grasp</title>
+ </head>
+ <body>
+ </body>
+
+ <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.5.11/p5.js"></script>
+ <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.5.11/addons/p5.dom.js"></script>
+ <script type="text/javascript" src="sketch.js"></script>
+ 
+ <script type="text/javascript">
+ //GLOBAL variables
+ var socket = new WebSocket("ws://localhost:8081");
+ //constants
+ var SIZEX, SIZEY, rectXY=25, rectYX=25;      // Position of button
+ var rectHighlight, circleHighlight, currentColor;
+//booleans
+var print = false, w=true,eval;
+var started = false, s1 =false, q = false; 
+var Pc = 0.0, G = 0.0, Xp = 0.0, Zp = 0.0, Xe = 0.0;
+//ints
+var i=0, ij=0,k=0, t=0,t1=0,f=0, e=0, x,y;
+var rectsize = 180,rectSize=55;     // Diameter of rect
+//floats
+var lf=0.0,gf1=0.0,gf2=0.0,prevlf=0.0,grip=0.0, prevgrip=0.0,c=0.0;
+var lfr=0.0,lfrprev = 0.0,gripr,griprprev,lfrnoise=1.0,gfrnoise=1.0; 
+var alf,alfr,agf,agfr;
+var anlf,anlfr,angf,angfr;
+var nlf,nlfr,ngfr,ngf;
+var varprocl=0.01,varmeasl=0.015080;
+var varprocg=0.01,varmeasg=0.0371;
+  
+var timeP, elapsedP, overP;
+
+function setup() {
+	createCanvas(windowWidth,windowHeight);
+ // SIZEX = windowWidth/10;
+  //SIZEY = windowHeight/5;
+  rectHighlight = color('#18DB37');
+  circleHighlight = color('#D32D54');
+  currentColor= color('#B7B5AE');
+
+  createButton('START')
+    .position(10,10)
+    .mousePressed(function() {
+      started = !started; //toggle start/stop
+      if (started) { 
+        console.log("start");
+        this.html("STOP");
+        t = second();
+      }
+      else {  //stop
+        console.log("stop");
+        this.html("START");
+      }
+    });
+
+  createButton('NORMAL')
+    .position(10,30)
+    .mousePressed(function() { console.log("norm") })
+    .mouseOver(function() { overP.html("Normal mode allows you to practice \nwith the involving hand")})
+    .mouseOut(function() { overP.html("") });
+
+  createButton('AFFECTED')
+    .position(10,50)
+    .mousePressed(function() { console.log("aff") })
+    .mouseOver(function() { overP.html("Affected hand mode allows you to practice \nwith the non-involving hand observing the \nperformance of the involving hand")})
+    .mouseOut(function() { overP.html("") });
+
+  createButton('EVALUATION')
+    .position(10,70)
+    .mousePressed(function() { console.log("eval"); })
+    .mouseOver(function() { overP.html("Evaluate button allows you to observe the \nperformance of the involving side\n to the involving hand") })
+    .mouseOut(function() { overP.html("") });
+	
+  overP = createP("").position(10,80);
+  timeP = createP("").position(10,height-80);
+  elapsedP = createP("Elapsed time: ").position(width/2+100,height-80);
+
+  socket.onopen = openSocket;
+  socket.onmessage = showData;
+}
+
+function draw() {
+  background('#75778B');  
+  timeP.html(new Date());
+  if (started) {
+    anim();
+    bar();
+    //filewriter();
+    prevlf=lf;
+    prevgrip = grip;
+    lfrprev = lfr;
+    griprprev = gripr;
+    //print = true;]
+      
+    elapsedP.html("Elapsed time: " + (second()-t));
+  }
+}
+
+
+//ball
+function anim() {
+  noStroke();
+  var c=color(20+(grip*10), 255-(grip*10), 0);
+  fill(c);
+  var d = 25+(5*grip);
+  ellipse(width/2, 3.5*height/4 -25-lf*100,d,d);
+}
+
+function openSocket() {
+    console.log("Socket open");
+}
+ 
+function showData(result) {
+  console.log(result.data);
+  readData(result.data);
+}
+
+function readData(data) {
+
+  var inputStringArr = data.split(",");
+  
+  if (inputStringArr.length == 3) {
+    lf=(parseFloat(trim(inputStringArr[0])))/100.0;
+    if(!started)c = lf;
+    if(started)lf = c-lf;
+    if(lf<=0)lf = 0.0;
+    if(started) {
+      gf1=(parseFloat(trim(inputStringArr[1])))/100.0;
+      gf2=(parseFloat(trim(inputStringArr[2])))/100.0;
+      grip=(gf1+gf2)/2;
+      lfr = 50.0*(lf - prevlf);
+      if(lfr<=0)lfr = 0.0;
+      lfr = Kalman(lfr,varprocl,varmeasl,lfrprev,lfrnoise);
+      lfrnoise = Pc;
+      gripr = 50.0* (grip - prevgrip);
+      if(gripr<=0)gripr=0.0;
+      //gripr = Kalman(gripr,varprocg,varmeasg,griprprev,gfrnoise);
+      gfrnoise = Pc;
+    }
+    //console.log("lf: " + lf + ", gf1: " + gf1 + ", gf2: " + gf2);
+  }
+  // if(w) { //normal mode
+    nlfr = lfr;
+    ngfr = gripr;
+    ngf = grip;
+    nlf = lf;
+  // }    
+  // else { //affected mode
+  //   alfr = lfr;
+  //   agfr = gripr;
+  //   agf = grip;
+  //   alf = lf;
+  // }
+}
+
+//needs cleanup (separate functions)
+function bar() {
+  noFill();
+  stroke(0, 0, 0, 105);
+  strokeWeight(2);
+  var wi= width/25;
+  var he =2.5*height/400;
+  rect(width/2 - width/2.2 - wi/2, height/2 - height/4, wi, height*2.5/4);
+  rect(width/2 + width/2.2 - wi/2, height/2 - height/4, wi, height*2.5/4);
+
+  if (w)                                               //normal mode
+  {
+    for (let i=0; i<ngfr; i++)            // GFR normal
+    {
+      stroke(0+(i*2.5), 255-(i*2.5), 5, 200);
+      fill(color(0+(i*2.5), 255-(i*3), 5, 200));
+      strokeWeight(2);
+      rect(width/2 - width/2.2 - wi/2, 3.5*height/4-(he*i), wi, -he);
+    }
+    for (let i=0; i<nlfr; i++)          // LFR normal
+    {
+      stroke(0+(i*2.5), 255-(i*3), 5, 200);
+      fill(color(0+(i*2.5), 255-(he*3), 5, 200));
+      strokeWeight(2);
+      rect(width/2 + width/2.2 - wi/2, 3.5*height/4-(he*i), wi, -he);
+    }
+  }
+  else  {                                               //affected mode
+    
+    rect(width/2 - width/3 -wi/2, height/2 - height/4, wi, height*2.5/4);
+    rect(width/2 + width/3 -wi/2, height/2 - height/4, wi, height*2.5/4);
+    
+    for (let i=0; i<alfr; i++)           //LFR affected
+    {
+      stroke(0+(i*2.5), 255-(i*3), 5, 200);
+      fill(color(0+(i*2.5), 255-(i*3), 5, 200));
+      strokeWeight(2);
+      rect(width/2 + width/3 -wi/2, 3.5*height/4-(he*i), wi, -he);
+    }
+
+    for (let i=0; i<agfr; i++)          //GFR affected
+    {
+      stroke(0+(i*2.5), 255-(i*2.5), 5, 200);
+      fill(color(0+(i*2.5), 255-(i*3), 5, 200));
+      strokeWeight(2);
+      rect(width/2 - width/3 -wi/2, 3.5*height/4-(he*i), wi, -he);
+    }
+    for (let i=0; i<angfr; i++)            // GFR normal
+    {
+      stroke(0+(i*2.5), 255-(i*2.5), 5, 200);
+      fill(color(0+(i*2.5), 255-(i*3), 5, 200));
+      strokeWeight(2);
+      rect(width/2 - width/2.2 - wi/2, 3.5*height/4-(he*i), wi, -he);
+    }
+    for (let i=0; i<anlfr; i++)          // LFR normal
+    {
+      stroke(0+(i*2.5), 255-(i*3), 5, 200);
+      fill(color(0+(i*2.5), 255-(i*3), 5, 200));
+      strokeWeight(2);
+      rect(width/2 + width/2.2 - wi/2, 3.5*height/4-he*i, wi, -he);
+    }
+  }
+
+  for (let i=0; i<100; i++)           //color coded reference
+  {
+    stroke(0+(i*2.5), 255-(i*2.5), 5, 50);
+    fill(color(0+(i*2.5), 255-(i*3), 5, 50));
+    rect(width/2 - width/2.2 - wi/2 + 0.06*width, 3.5*height/4 - (he*i), 20, -he);
+    rect(width/2 + width/2.2 - wi/2 - 0.06*width, 3.5*height/4 - (he*i), 20, -he);
+  }
+/*
+  for (let i=0; i<=100; i+=25)          //text for lFR and GFR
+  {
+    fill(0);
+    textFont(myFont, 20);
+    textAlign(CENTER);
+    text(i, width/2 - width/2.2 + wi/2 + 0.06*width, 3.5*height/4 - he*i);
+    text(i, width/2 + width/2.2 + wi/2 - 0.06*width, 3.5*height/4 - he*i);
+  }
+  */
+}
+
+//returns NaN for grip force rate
+function Kalman(val, varProcess, varmeas, prev, noise) {  
+  Pc = noise + varProcess;
+  G = Pc/(Pc + varmeas);
+  Pc = (1-G)*Pc;
+  Xp = prev;
+  Zp = Xp;
+  Xe = G*(val-Zp)+Xp;
+  return(Xe);
+}
+
+ </script>
+</html>

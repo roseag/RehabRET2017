@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8">
+ <title>Jacket</title>
+ </head>
+ <body>
+ </body>
+
+ <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.5.11/p5.js"></script>
+ <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.5.11/addons/p5.dom.js"></script>
+ <script type="text/javascript" src="sketch.js"></script>
+ 
+ <script type="text/javascript">
+ 
+ var socket = new WebSocket("ws://localhost:8081");
+ var armAngle = 0;
+ var textBox = []; 
+ var SIZEX, SIZEY;
+ var Euler;
+ var loc;
+ //var varmeasq = [], 
+
+function setup() {
+	createCanvas(windowWidth,windowHeight,WEBGL);
+  SIZEX = windowWidth/10;
+  SIZEY = windowHeight/5;
+	
+  socket.onopen = openSocket;
+  socket.onmessage = showData;
+
+  Euler = {
+    a: createVector(0,0,0),
+    b: createVector(0,0,0),
+    c: createVector(0,0,0),
+    d: createVector(0,0,0)
+  };
+
+  loc = {
+    a: -300,
+    b: -100,
+    c: 100,
+    d: 300
+  }
+
+  addText();
+  /*
+  //smooth();
+  //frameRate stays at 12 regardless with animation
+  // The socket connection needs two event listeners:
+  varmeasq[0] = 1.67972E-08;
+  varmeasq[1] = 1.99482E-07;
+  varmeasq[2] = 1.92431E-07;
+  varmeasq[3] = 1.4562E-07;
+  cov[0] = 1.0;
+  cov[1] = 1.0;
+  cov[2] = 1.0;
+  cov[3] = 1.0;
+
+  for (var i=0;i<=3;i++)
+    qbprev[i] = qb[i];*/
+}
+
+function draw() {
+  background(57,137,117);
+  drawBody();
+  textinpage();
+  Handanim();
+}
+
+//pod viz for debug purposes
+function drawPods() {
+  var x = -300;
+  for (var e in Euler) {
+    push();
+    translate(x,0,0);
+    rotateX(Euler[e].x);
+    rotateY(Euler[e].y);
+    rotateZ(Euler[e].z);
+    box(200, 100, 100);
+    pop();
+    x+= 200;
+  }
+}
+
+function keyTyped() {
+  //keyPressed does not work in Chrome browser
+  if(key == 'h') {
+    console.log("pressed h");
+    // set hq the home quaternion as the quatnion conjugate coming from the sensor fusion
+    hqa = quatConjugate(qa);
+    hqb = quatConjugate(qb);
+    hqc = quatConjugate(qc);
+    hqd = quatConjugate(qd);
+    hqe = quatConjugate(qe);
+    hq = quatConjugate(q);
+  }
+  else if(key == 'n') {
+    console.log("pressed n");
+    hqa = null;
+    hqb = null;
+    hqc = null;
+    hqd = null;
+    hqe = null;
+    hq = null; 
+  }
+  return false;
+}
+
+function openSocket() {
+    console.log("Socket open");
+}
+ 
+function showData(result) {
+  console.log(result.data);
+  var data = result.data;
+  var dataArr = data.split(",");
+  
+  if (dataArr.length == 4) { //QUATERNION
+    
+    var letter = dataArr.shift(); 
+    var v = createVector(parseFloat(dataArr[0]),
+                        parseFloat(dataArr[1]),
+                        parseFloat(dataArr[2]));
+
+   Euler[letter] = v;
+   //console.log(letter + ": " + Euler[letter]);
+
+  }
+}
+
+//can definitely be improved...
+function addText() {
+  textBox.push(createDiv("Range of Motion Visualizer").position(10,10));
+  //LEFT
+  textBox.push(createDiv("Left Shoulder").position(10,30));
+  textBox.push(createDiv("Extension/Flexion: ").position(30,50));
+  textBox.push(createDiv("Internal/external rotation: ").position(30,70));
+  textBox.push(createDiv("Abduction/Adduction: ").position(30,90));
+  textBox.push(createDiv("Left Elbow").position(10,110));
+  textBox.push(createDiv("Extension/Flexion: ").position(30,130));
+  textBox.push(createDiv("Pronation/Supination: ").position(30,150));
+  //RIGHT
+  textBox.push(createDiv("Right Shoulder").position(10,170));
+  textBox.push(createDiv("Extension/Flexion: ").position(30,190));
+  textBox.push(createDiv("Internal/external rotation: ").position(30,210));
+  textBox.push(createDiv("Abduction/Adduction: ").position(30,230));
+  textBox.push(createDiv("Right Elbow").position(10,250));
+  textBox.push(createDiv("Extension/Flexion: ").position(30,270));
+  textBox.push(createDiv("Pronation/Supination: ").position(30,290));
+  
+  textBox.push(createDiv("Sampling rate: ").position(10,310));
+}
+
+ </script>
+</html>
